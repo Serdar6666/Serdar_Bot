@@ -4,18 +4,21 @@ import time
 # --- SAZLAMALAR ---
 TELEGRAM_BOT_TOKEN = "7996669637:AAEztTnfTpzndg_x_oHBn16G6_VvHPfkw8k"
 CHAT_ID = "7556694843"
-SYMBOL = "EURUSD"                # Barlamak isleýän jübüňiz ýa-da instrumentiňiz
+SYMBOL = "EURUSD"
 
 last_price = None
 
 def get_xm_price():
     try:
-        # Bazardaky nyrhlary alyp bérýän çeşme
-        url = f"https://api.coinbase.com/v2/prices/{SYMBOL}-USD/spot"
+        # Alternatiw ygtybarly açyk baha çeşmesi (Forex Exchange rates)
+        url = "https://open.er-api.com/v6/latest/EUR"
         response = requests.get(url, timeout=10)
         data = response.json()
-        price = float(data['data']['amount'])
-        return price
+        
+        # EUR to USD bahasyny alýarys
+        if "rates" in data and "USD" in data["rates"]:
+            return float(data["rates"]["USD"])
+        return None
     except Exception as e:
         print(f"Baha alyp bolmady: {e}")
         return None
@@ -40,6 +43,7 @@ def main():
         current_price = get_xm_price()
         
         if current_price is not None:
+            print(current_price) # Baha barlamak üçin logda görkezer
             if last_price is not None:
                 if current_price > last_price:
                     msg = f"📈 *Baha Galýar!*\nInstrument: `{SYMBOL}`\nTäze baha: `{current_price}` (Öňki: `{last_price}`)"
