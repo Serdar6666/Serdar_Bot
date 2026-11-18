@@ -1,7 +1,12 @@
+import os
 import requests
-import time
+from flask import Flask, request
+import telebot
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 TELEGRAM_BOT_TOKEN = "9117274265:AAECiuQJHXhXf5ZY2jKgzZdagdF3hmTq_H0"
+bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
+app = Flask(__name__)
 
 def get_market_price(symbol):
     try:
@@ -24,65 +29,55 @@ def get_market_price(symbol):
         print(f"Baha alyp bolmady ({symbol}): {e}")
     return None
 
-def send_message(chat_id, text, reply_markup=None):
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
-    if reply_markup:
-        payload["reply_markup"] = reply_markup
-    try:
-        requests.post(url, json=payload, timeout=10)
-    except Exception as e:
-        print(f"Telegrama ugradyp bolmady: {e}")
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    markup = InlineKeyboardMarkup()
+    markup.row_width = 2
+    markup.add(
+        InlineKeyboardButton("💶 EUR/USD", callback_data="price_EURUSD"),
+        InlineKeyboardButton("💷 GBP/USD", callback_data="price_GBPUSD"),
+        InlineKeyboardButton("₿ Bitcoin (BTC)", callback_data="price_BTC"),
+        InlineKeyboardButton("Ξ Ethereum (ETH)", callback_data="price_ETH")
+    )
+    bot.send_message(
+        message.chat.id, 
+        "Salam! Aşakdaky bazarlardan birini saýlaň. Men size bahany we bazaryň ýagdaýyny görkezerin:", 
+        reply_markup=markup
+    )
 
-def main():
-    print("Bot göni HTTP arkaly işe başlady...")
-    offset = 0
+@bot.callback_query_handler(func=lambda call: True)
+def callback_query(call):
+    symbol = call.data.split("_")[1]
+    price = get_market_price(symbol)
     
-    while True:
-        try:
-            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates?offset={offset}&timeout=30"
-            response = requests.get(url, timeout=35)
-            data = response.json()
-            
-            if "result" in data:
-                for update in data["result"]:
-                    offset = update["update_id"] + 1
-                    
-                    # Eger ulanyjydan habar gelen bolsa
-                    if "message" in update:
-                        chat_id = update["message"]["chat"]["id"]
-                        text = update["message"].get("text", "")
-                        
-                        if text == "/start":
-                            markup = {
-                                "inline_keyboard": [
-                                    [{"text": "💶 EUR/USD", "callback_data": "EURUSD"}, {"text": "💷 GBP/USD", "callback_data": "GBPUSD"}],
-                                    [{"text": "₿ Bitcoin (BTC)", "callback_data": "BTC"}, {"text": "Ξ Ethereum (ETH)", "callback_data": "ETH"}]
-                                ]
-                            }
-                            send_message(chat_id, "Salam! Aşakdaky bazarlardan birini saýlaň:", reply_markup=markup)
-                    
-                    # Eger düwmä basylan bolsa (callback query)
-                    elif "callback_query" in update:
-                        callback = update["callback_query"]
-                        chat_id = callback["message"]["chat"]["id"]
-                        symbol = callback["data"]
-                        callback_id = callback["id"]
-                        
-                        # Callback bildirişini aýyrmak
-                        requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/answerCallbackQuery", json={"callback_query_id": callback_id})
-                        
-                        price = get_market_price(symbol)
-                        if price is not None:
-                            msg = f"📊 *Bazar Maglumaty: {symbol}*\n\n💰 Häzirki baha: `{price}`\n📈 Maslahat: **Bazary öwreniň (Neutral)**"
-                        else:
-                            msg = f"Bagyşlaň, {symbol} boýunça maglumat alyp bolmady."
-                            
-                        send_message(chat_id, msg)
-                        
-        except Exception as e:
-            print(f"Säwlik: {e}")
-            time.sleep(3)
+    if price is not None:
+        text = (
+            f"📊 **Bazar Maglumaty: {symbol}**\n\n"
+            f"💰 Häzirki baha: `{price}`\n"
+            f"📈 Maslahat: **Bazary öwreniň (Neutral)**\n"
+            f"💡 *Üns beriň: Maglumat maksatly berilýär.*"
+        )
+    else:
+        text = f"Bagyşlaň, {symbol} boýunça maglumat alyp bolmady."
+    
+    bot.answer_callback_query(call.id)
+    bot.send_message(call.message.chat.id, text, parse_mode="Markdown")
+
+@app.route(f"/{TELEGRAM_BOT_TOKEN}", methods=["POST"])
+def webhook():
+    json_string = request.get_data().decode("utf-8")
+    update = telebot.types.Update.de_json(json_string)
+    bot.process_new_updates([update])
+    return "!", 200
+
+@app.route("/")
+def index():
+    return "Bot bulutda işleýär!", 200
 
 if __name__ == "__main__":
-    main()
+    # Railway tarapyndan berilýän port bilen işlemek üçin
+    port = int(os.environ.get("PORT", 5000))
+    
+    # Webhook-y sazlamak (Railway-däki domen adyňyzy bolar ýaly)
+    # Häzirçe bulutda durnukly işlemegi üçin polling ýerine web server açýarys
+    app.run(host="0.0.0.0", port=port)
