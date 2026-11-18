@@ -3,7 +3,7 @@ import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # Siziň täze bot tokeniňiz
-TELEGRAM_BOT_TOKEN = "9117274265:AAECiuQJHXhXf5ZY2jKgzZdagdF3hmTq_H0"
+TELEGRAM_BOT_TOKEN = "9117274265:AAECiuQJHXhXf5ZY2jkGzZdagdF3hmTq_H0"
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
 # Bazar bahalaryny alyp berýän funksiýa
