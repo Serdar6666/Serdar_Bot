@@ -1,13 +1,12 @@
-import os
 import requests
-from flask import Flask, request
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
+# Siziň täze bot tokeniňiz
 TELEGRAM_BOT_TOKEN = "9117274265:AAECiuQJHXhXf5ZY2jKgzZdagdF3hmTq_H0"
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
-app = Flask(__name__)
 
+# Bazar bahalaryny alyp berýän funksiýa
 def get_market_price(symbol):
     try:
         if symbol in ["EURUSD", "GBPUSD"]:
@@ -26,9 +25,10 @@ def get_market_price(symbol):
             if key in data and "usd" in data[key]:
                 return float(data[key]["usd"])
     except Exception as e:
-        print(f"Baha alyp bolmady ({symbol}): {e}")
+        print(f"Baha alnanda säwlik çykdy ({symbol}): {e}")
     return None
 
+# /start ýazanynda çykjak düwmeler
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     markup = InlineKeyboardMarkup()
@@ -41,13 +41,15 @@ def send_welcome(message):
     )
     bot.send_message(
         message.chat.id, 
-        "Salam! Aşakdaky bazarlardan birini saýlaň. Men size bahany we bazaryň ýagdaýyny görkezerin:", 
+        "Salam! Aşakdaky bazarlardan birini saýlaň we bahany görüň:", 
         reply_markup=markup
     )
 
+# Düwmelere basylanda jogap beriş
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
-    symbol = call.data.split("_")[1]
+    # callback_data içindäki simwoly alyp barlalyň
+    symbol = call.data.replace("price_", "")
     price = get_market_price(symbol)
     
     if price is not None:
@@ -55,7 +57,7 @@ def callback_query(call):
             f"📊 **Bazar Maglumaty: {symbol}**\n\n"
             f"💰 Häzirki baha: `{price}`\n"
             f"📈 Maslahat: **Bazary öwreniň (Neutral)**\n"
-            f"💡 *Üns beriň: Maglumat maksatly berilýär.*"
+            f"💡 *Maglumat maksatly berilýär.*"
         )
     else:
         text = f"Bagyşlaň, {symbol} boýunça maglumat alyp bolmady."
@@ -63,21 +65,7 @@ def callback_query(call):
     bot.answer_callback_query(call.id)
     bot.send_message(call.message.chat.id, text, parse_mode="Markdown")
 
-@app.route(f"/{TELEGRAM_BOT_TOKEN}", methods=["POST"])
-def webhook():
-    json_string = request.get_data().decode("utf-8")
-    update = telebot.types.Update.de_json(json_string)
-    bot.process_new_updates([update])
-    return "!", 200
-
-@app.route("/")
-def index():
-    return "Bot bulutda işleýär!", 200
-
 if __name__ == "__main__":
-    # Railway tarapyndan berilýän port bilen işlemek üçin
-    port = int(os.environ.get("PORT", 5000))
-    
-    # Webhook-y sazlamak (Railway-däki domen adyňyzy bolar ýaly)
-    # Häzirçe bulutda durnukly işlemegi üçin polling ýerine web server açýarys
-    app.run(host="0.0.0.0", port=port)
+    print("Bot işe başlady...")
+    # Timeout we baglanyşyk säwliklerini aýyrmak üçin esasy polling
+    bot.infinity_polling(timeout=60, long_polling_timeout=60)
