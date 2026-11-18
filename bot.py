@@ -3,8 +3,11 @@ import time
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-# --- TÄZE BOT TOKENI ---
 TELEGRAM_BOT_TOKEN = "9117274265:AAECiuQJHXhXf5ZY2jKgzZdagdF3hmTq_H0"
+
+# Timeout we birikme säwliklerini bejermek üçin telebot sazlamasy
+telebot.apihelper.CONNECT_TIMEOUT = 20
+telebot.apihelper.READ_TIMEOUT = 20
 
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
@@ -65,4 +68,10 @@ def callback_query(call):
 
 if __name__ == "__main__":
     print("Interaktiw Bazar Boti işe başlady...")
-    bot.infinity_polling()
+    while True:
+        try:
+            # Baglanyşyk üzülse bot ýykylyp galmaz ýaly try-except içine aldık
+            bot.infinity_polling(timeout=60, long_polling_timeout=60)
+        except Exception as e:
+            print(f"Baglanyşyk säwligi: {e}")
+            time.sleep(5)
