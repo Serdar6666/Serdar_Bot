@@ -11,37 +11,34 @@ def get_market_analysis(symbol):
         if symbol == "EURUSD":
             url = "https://open.er-api.com/v6/latest/EUR"
             response = requests.get(url, timeout=5)
-            data = response.json()
-            price = float(data["rates"]["USD"])
+            price = float(response.json()["rates"]["USD"])
         elif symbol == "GBPUSD":
             url = "https://open.er-api.com/v6/latest/GBP"
             response = requests.get(url, timeout=5)
-            data = response.json()
-            price = float(data["rates"]["USD"])
-        elif symbol == "BTC":
-            # Binance ýa-da CoinGecko bökdese hem awtomatiki üpjün ediji
-            try:
-                res = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT", timeout=4)
-                price = float(res.json()["price"])
-            except:
-                res2 = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd", timeout=4)
-                price = float(res2.json()["bitcoin"]["usd"])
-        elif symbol == "ETH":
-            try:
-                res = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT", timeout=4)
-                price = float(res.json()["price"])
-            except:
-                res2 = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd", timeout=4)
-                price = float(res2.json()["ethereum"]["usd"])
+            price = float(response.json()["rates"]["USD"])
+        elif symbol == "USDJPY":
+            url = "https://open.er-api.com/v6/latest/USD"
+            response = requests.get(url, timeout=5)
+            price = float(response.json()["rates"]["JPY"])
+        elif symbol == "AUDUSD":
+            url = "https://open.er-api.com/v6/latest/AUD"
+            response = requests.get(url, timeout=5)
+            price = float(response.json()["rates"]["USD"])
+        else:
+            # Kriptolar üçin Binance
+            pair = f"{symbol}USDT"
+            res = requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={pair}", timeout=4)
+            price = float(res.json()["price"])
     except Exception as e:
         print(f"API säwligi ({symbol}): {e}")
     
-    # Eger internet ýa-da API wagtlaýyn bökdense, hakyky bazara golaý baha görkezmek üçin ätiýaçlyk
+    # Ätiýaçlyk bahalar
     if price is None:
-        if symbol == "EURUSD": price = 1.0998
-        elif symbol == "GBPUSD": price = 1.3199
-        elif symbol == "BTC": price = 91450.0
-        elif symbol == "ETH": price = 3120.0
+        fallbacks = {
+            "EURUSD": 1.0998, "GBPUSD": 1.3199, "USDJPY": 154.50, "AUDUSD": 0.6500,
+            "BTC": 91450.0, "ETH": 3120.0, "BNB": 640.0, "XRP": 0.55, "SOL": 210.0
+        }
+        price = fallbacks.get(symbol, 100.0)
 
     # Maslahat çykarmak
     int_part = int(price * 100)
@@ -59,12 +56,17 @@ def send_welcome(message):
     markup.add(
         InlineKeyboardButton("💶 EUR/USD", callback_data="price_EURUSD"),
         InlineKeyboardButton("💷 GBP/USD", callback_data="price_GBPUSD"),
+        InlineKeyboardButton("💴 USD/JPY", callback_data="price_USDJPY"),
+        InlineKeyboardButton("🇦🇺 AUD/USD", callback_data="price_AUDUSD"),
         InlineKeyboardButton("₿ Bitcoin (BTC)", callback_data="price_BTC"),
-        InlineKeyboardButton("Ξ Ethereum (ETH)", callback_data="price_ETH")
+        InlineKeyboardButton("Ξ Ethereum (ETH)", callback_data="price_ETH"),
+        InlineKeyboardButton("🪙 Binance (BNB)", callback_data="price_BNB"),
+        InlineKeyboardButton("💧 Ripple (XRP)", callback_data="price_XRP"),
+        InlineKeyboardButton("☀️ Solana (SOL)", callback_data="price_SOL")
     )
     bot.send_message(
         message.chat.id, 
-        "Salam! Bazary saýlaň, men size baha we takyk algy-saty maslahatyny görkezerin:", 
+        "Salam! Esasy bazarlardan birini saýlaň:", 
         reply_markup=markup
     )
 
