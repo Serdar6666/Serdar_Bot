@@ -6,7 +6,6 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 TELEGRAM_BOT_TOKEN = "9117274265:AAGxLEjHLdmgpCuxjA62r_7dE10_t6evAvk"
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
-# Bazarlary saýlamak üçin esasy düwmeler funksiýasy
 def get_market_keyboard():
     markup = InlineKeyboardMarkup()
     markup.row_width = 2
@@ -48,16 +47,11 @@ def get_market_analysis(symbol):
             price = float(res.json()["price"])
     except Exception as e:
         print(f"API säwligi ({symbol}): {e}")
-    
-    # Ätiýaçlyk bahalar
-    if price is None:
-        fallbacks = {
-            "EURUSD": 1.0998, "GBPUSD": 1.3199, "USDJPY": 154.50, "AUDUSD": 0.6500,
-            "BTC": 91450.0, "ETH": 3120.0, "BNB": 640.0, "XRP": 0.55, "SOL": 210.0
-        }
-        price = fallbacks.get(symbol, 100.0)
 
-    # Maslahat çykarmak
+    if price is None:
+        return None, "Maglumat ýok"
+
+    # Hakyky baha görä maslahat
     int_part = int(price * 100)
     if int_part % 2 == 0:
         advice = "🟢 **SATYN ALYŇ (BUY)** 🚀"
@@ -79,20 +73,26 @@ def callback_query(call):
     symbol = call.data.replace("price_", "")
     price, advice = get_market_analysis(symbol)
     
-    # XM Broker server wagty (GMT+2)
     xm_time = (datetime.datetime.utcnow() + datetime.timedelta(hours=2)).strftime('%Y-%m-%d  %H:%M:%S')
     
-    text = (
-        f"📊 **Bazar Maglumaty: {symbol}**\n\n"
-        f"💰 Häzirki baha: `{price}`\n"
-        f"📈 Maslahat: {advice}\n"
-        f"🕒 XM Server Wagty: `{xm_time}`\n"
-        f"💡 *Maglumat maksatly berilýär.*\n\n"
-        f"👇 Başga bazar saýlaň:"
-    )
+    if price is not None:
+        text = (
+            f"📊 **Bazar Maglumaty: {symbol}**\n\n"
+            f"💰 Häzirki baha: `{price}`\n"
+            f"📈 Maslahat: {advice}\n"
+            f"🕒 XM Server Wagty: `{xm_time}`\n"
+            f"💡 *Maglumat maksatly berilýär.*\n\n"
+            f"👇 Başga bazar saýlaň:"
+        )
+    else:
+        text = (
+            f"📊 **Bazar Maglumaty: {symbol}**\n\n"
+            f"⚠️ Häzirki wagtda bu bazar ýapyk ýa-da maglumat alyp bolmady (Forex gije sagatlarynda ýapyk bolýar).\n"
+            f"🕒 XM Server Wagty: `{xm_time}`\n\n"
+            f"👇 Başga bazar saýlaň:"
+        )
     
     bot.answer_callback_query(call.id)
-    # Her jogabyň aşagyna bazar saýlaýan düwmeler goşuldy
     bot.send_message(call.message.chat.id, text, reply_markup=get_market_keyboard(), parse_mode="Markdown")
 
 if __name__ == "__main__":
