@@ -2,13 +2,16 @@ import requests
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-# Siziň täze bot tokeniňiz
+# Siziň täze we hakyky tokeniňiz
 TELEGRAM_BOT_TOKEN = "9117274265:AAGxLEjHLdmgpCuxjA62r_7dE10_t6evAvk"
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
-# Bazar bahalaryny alyp berýän funksiýa
-def get_market_price(symbol):
+# Öňki bahalary ýadynda saklamak üçin
+last_prices = {}
+
+def get_market_analysis(symbol):
     try:
+        price = None
         if symbol in ["EURUSD", "GBPUSD"]:
             base = symbol[:3]
             target = symbol[3:]
@@ -16,19 +19,31 @@ def get_market_price(symbol):
             response = requests.get(url, timeout=10)
             data = response.json()
             if "rates" in data and target in data["rates"]:
-                return float(data["rates"][target])
+                price = float(data["rates"][target])
         elif symbol in ["BTC", "ETH"]:
             url = f"https://api.coingecko.com/api/v3/simple/price?ids={symbol.lower()}&vs_currencies=usd"
             response = requests.get(url, timeout=10)
             data = response.json()
             key = symbol.lower()
             if key in data and "usd" in data[key]:
-                return float(data[key]["usd"])
+                price = float(data[key]["usd"])
+        
+        if price is not None:
+            advice = "Bazary öwreniň (Neutral) ⚖️"
+            if symbol in last_prices:
+                if price > last_prices[symbol]:
+                    advice = "🟢 **SATYN ALYŇ (BUY)** 🚀"
+                elif price < last_prices[symbol]:
+                    advice = "🔴 **SATYŇ (SELL)** 📉"
+            
+            last_prices[symbol] = price
+            return price, advice
+            
     except Exception as e:
         print(f"Baha alnanda säwlik çykdy ({symbol}): {e}")
-    return None
+    
+    return None, "Maglumat ýok"
 
-# /start ýazanynda çykjak düwmeler
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     markup = InlineKeyboardMarkup()
@@ -41,22 +56,20 @@ def send_welcome(message):
     )
     bot.send_message(
         message.chat.id, 
-        "Salam! Aşakdaky bazarlardan birini saýlaň we bahany görüň:", 
+        "Salam! Bazary saýlaň, men size baha we hakyky algy-saty maslahatyny görkezerin:", 
         reply_markup=markup
     )
 
-# Düwmelere basylanda jogap beriş
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
-    # callback_data içindäki simwoly alyp barlalyň
     symbol = call.data.replace("price_", "")
-    price = get_market_price(symbol)
+    price, advice = get_market_analysis(symbol)
     
     if price is not None:
         text = (
             f"📊 **Bazar Maglumaty: {symbol}**\n\n"
             f"💰 Häzirki baha: `{price}`\n"
-            f"📈 Maslahat: **Bazary öwreniň (Neutral)**\n"
+            f"📈 Maslahat: {advice}\n"
             f"💡 *Maglumat maksatly berilýär.*"
         )
     else:
@@ -67,5 +80,4 @@ def callback_query(call):
 
 if __name__ == "__main__":
     print("Bot işe başlady...")
-    # Timeout we baglanyşyk säwliklerini aýyrmak üçin esasy polling
     bot.infinity_polling(timeout=60, long_polling_timeout=60)
