@@ -4,7 +4,7 @@ import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # --- SAZLAMALAR ---
-TELEGRAM_BOT_TOKEN = "7996669637:AAEztTnfTpzndg_x_oHBn16G6_VvHPfkw8k"
+TELEGRAM_BOT_TOKEN = "7996669637:AAEN5UD8K4nu7N_Ro_7bEJovfVt3tReUSSY"
 
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
