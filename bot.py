@@ -1,3 +1,4 @@
+import datetime
 import requests
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -25,7 +26,6 @@ def get_market_analysis(symbol):
             response = requests.get(url, timeout=5)
             price = float(response.json()["rates"]["USD"])
         else:
-            # Kriptolar üçin Binance
             pair = f"{symbol}USDT"
             res = requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={pair}", timeout=4)
             price = float(res.json()["price"])
@@ -75,10 +75,14 @@ def callback_query(call):
     symbol = call.data.replace("price_", "")
     price, advice = get_market_analysis(symbol)
     
+    # Häzirki wagty almak (GMT+5 / Türkmenistan wagty üçin)
+    current_time = (datetime.datetime.utcnow() + datetime.timedelta(hours=5)).strftime('%Y-%m-%d  %H:%M:%S')
+    
     text = (
         f"📊 **Bazar Maglumaty: {symbol}**\n\n"
         f"💰 Häzirki baha: `{price}`\n"
         f"📈 Maslahat: {advice}\n"
+        f"🕒 Wagt: `{current_time}`\n"
         f"💡 *Maglumat maksatly berilýär.*"
     )
     
