@@ -5,10 +5,6 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 TELEGRAM_BOT_TOKEN = "9117274265:AAECiuQJHXhXf5ZY2jKgzZdagdF3hmTq_H0"
 
-# Timeout we birikme säwliklerini bejermek üçin telebot sazlamasy
-telebot.apihelper.CONNECT_TIMEOUT = 20
-telebot.apihelper.READ_TIMEOUT = 20
-
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
 def get_market_price(symbol):
@@ -17,13 +13,13 @@ def get_market_price(symbol):
             base = symbol[:3]
             target = symbol[3:]
             url = f"https://open.er-api.com/v6/latest/{base}"
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, timeout=15)
             data = response.json()
             if "rates" in data and target in data["rates"]:
                 return float(data["rates"][target])
         elif symbol in ["BTC", "ETH"]:
             url = f"https://api.coingecko.com/api/v3/simple/price?ids={symbol.lower()}&vs_currencies=usd"
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, timeout=15)
             data = response.json()
             key = symbol.lower()
             if key in data and "usd" in data[key]:
@@ -67,11 +63,10 @@ def callback_query(call):
     bot.send_message(call.message.chat.id, text, parse_mode="Markdown")
 
 if __name__ == "__main__":
-    print("Interaktiw Bazar Boti işe başlady...")
+    print("Bot işe başlady...")
     while True:
         try:
-            # Baglanyşyk üzülse bot ýykylyp galmaz ýaly try-except içine aldık
-            bot.infinity_polling(timeout=60, long_polling_timeout=60)
+            bot.polling(none_stop=True, interval=2, timeout=30)
         except Exception as e:
-            print(f"Baglanyşyk säwligi: {e}")
+            print(f"Säwlik ýüze çykdy: {e}")
             time.sleep(5)
