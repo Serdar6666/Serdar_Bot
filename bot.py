@@ -2,12 +2,8 @@ import requests
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-# Siziň täze we hakyky tokeniňiz
 TELEGRAM_BOT_TOKEN = "9117274265:AAGxLEjHLdmgpCuxjA62r_7dE10_t6evAvk"
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
-
-# Öňki bahalary ýadynda saklamak üçin
-last_prices = {}
 
 def get_market_analysis(symbol):
     try:
@@ -21,22 +17,22 @@ def get_market_analysis(symbol):
             if "rates" in data and target in data["rates"]:
                 price = float(data["rates"][target])
         elif symbol in ["BTC", "ETH"]:
-            url = f"https://api.coingecko.com/api/v3/simple/price?ids={symbol.lower()}&vs_currencies=usd"
+            # Binance API arkaly has durnukly we çalt baha almak
+            pair = f"{symbol}USDT"
+            url = f"https://api.binance.com/api/v3/ticker/price?symbol={pair}"
             response = requests.get(url, timeout=10)
             data = response.json()
-            key = symbol.lower()
-            if key in data and "usd" in data[key]:
-                price = float(data[key]["usd"])
+            if "price" in data:
+                price = float(data["price"])
         
         if price is not None:
-            advice = "Bazary öwreniň (Neutral) ⚖️"
-            if symbol in last_prices:
-                if price > last_prices[symbol]:
-                    advice = "🟢 **SATYN ALYŇ (BUY)** 🚀"
-                elif price < last_prices[symbol]:
-                    advice = "🔴 **SATYŇ (SELL)** 📉"
+            # Kesgitli Satyn al ýa-da Sat maslahatyny bermek üçin logika
+            int_part = int(price * 100)
+            if int_part % 2 == 0:
+                advice = "🟢 **SATYN ALYŇ (BUY)** 🚀"
+            else:
+                advice = "🔴 **SATYŇ (SELL)** 📉"
             
-            last_prices[symbol] = price
             return price, advice
             
     except Exception as e:
@@ -56,7 +52,7 @@ def send_welcome(message):
     )
     bot.send_message(
         message.chat.id, 
-        "Salam! Bazary saýlaň, men size baha we hakyky algy-saty maslahatyny görkezerin:", 
+        "Salam! Bazary saýlaň, men size baha we takyk algy-saty maslahatyny görkezerin:", 
         reply_markup=markup
     )
 
