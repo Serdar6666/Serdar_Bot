@@ -23,42 +23,72 @@ def get_market_keyboard():
     )
     return markup
 
-def get_signal(symbol):
+def calc_ema(values, period):
+    if not values:
+        return 0.0
+    k = 2 / (period + 1)
+    ema = values[0]
+    for v in values[1:]:
+        ema = v * k + ema * (1 - k)
+    return ema
+
+def calc_rsi(closes, period=14):
+    if len(closes) <= period:
+        return 50.0
+    gains = []
+    losses = []
+    for i in range(1, len(closes)):
+        diff = closes[i] - closes[i - 1]
+        gains.append(max(diff, 0.0))
+        losses.append(max(-diff, 0.0))
+    avg_gain = sum(gains[-period:]) / period
+    avg_loss = sum(losses[-period:]) / period
+    if avg_loss == 0:
+        return 100.0
+    rs = avg_gain / avg_loss
+    return 100.0 - (100.0 / (1.0 + rs))
+
+def get_technical_signal(symbol):
     now_ns = time.time_ns()
-    seed_val = 0
+    closes = []
 
     try:
         t_param = int(time.time() * 1000)
-        if symbol in ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD"]:
-            url = f"https://open.er-api.com/v6/latest/USD?_={t_param}"
-            resp = requests.get(url, timeout=3)
-            rates = resp.json().get("rates", {})
-            if symbol == "EURUSD":
-                raw = 1.0 / float(rates.get("EUR", 0.92))
-            elif symbol == "GBPUSD":
-                raw = 1.0 / float(rates.get("GBP", 0.78))
-            elif symbol == "USDJPY":
-                raw = float(rates.get("JPY", 154.0))
-            elif symbol == "AUDUSD":
-                raw = 1.0 / float(rates.get("AUD", 1.52))
-            seed_val = int(round(raw * 100000)) + (now_ns // 1000000)
-        else:
+        if symbol not in ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD"]:
             pair = f"{symbol}USDT"
-            url = f"https://api.binance.com/api/v3/ticker/price?symbol={pair}&_={t_param}"
-            resp = requests.get(url, timeout=3)
-            raw = float(resp.json()["price"])
-            seed_val = int(round(raw * 100)) + (now_ns // 1000000)
-    except Exception:
+            url = f"https://api.binance.com/api/v3/klines?symbol={pair}&interval=1m&limit=40&_={t_param}"
+            resp = requests.get(url, timeout=4)
+            klines = resp.json()
+            if isinstance(klines, list) and len(klines) >= 20:
+                for k in klines:
+                    closes.append(float(k[4]))
+    except Exception as e:
+        print(f"Klines säwligi ({symbol}): {e}")
+
+    if len(closes) >= 20:
+        rsi = calc_rsi(closes, 14)
+        ema_fast = calc_ema(closes[-10:], 7)
+        ema_slow = calc_ema(closes[-25:], 21)
+
+        if rsi < 35 and ema_fast >= ema_slow:
+            is_up = True
+            minutes = 3
+        elif rsi > 65 and ema_fast <= ema_slow:
+            is_up = False
+            minutes = 3
+        elif ema_fast > ema_slow:
+            is_up = True
+            minutes = 2 if rsi < 55 else 1
+        else:
+            is_up = False
+            minutes = 2 if rsi > 45 else 1
+    else:
         seed_val = now_ns // 1000000
+        is_up = (seed_val % 2 == 0)
+        minutes_list = [1, 2, 3, 5]
+        minutes = minutes_list[(seed_val // 2) % len(minutes_list)]
 
-    # Ugrundaky ugry (BUY ýa-da SELL) kesgitlemek
-    is_buy = (seed_val % 2 == 0)
-
-    # Näçe minutlykdygyny (1, 2, 3 ýa-da 5 minut) kesgitlemek
-    minutes_list = [1, 2, 3, 5]
-    minutes = minutes_list[(seed_val // 2) % len(minutes_list)]
-
-    return is_buy, minutes
+    return is_up, minutes
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -71,21 +101,19 @@ def send_welcome(message):
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
     symbol = call.data.replace("sig_", "")
-    is_buy, minutes = get_signal(symbol)
+    is_up, minutes = get_technical_signal(symbol)
 
     xm_time = (datetime.datetime.utcnow() + datetime.timedelta(hours=2)).strftime("%H:%M:%S")
 
-    if is_buy:
-        arrow = "⬆️⬆️⬆️\n# **BUY**\n⬆️⬆️⬆️"
-        action_text = f"**{minutes} MINUT — BUY**"
+    if is_up:
+        big_arrow = "⬆️⬆️⬆️⬆️⬆️\n⬆️⬆️⬆️⬆️⬆️\n⬆️⬆️⬆️⬆️⬆️"
     else:
-        arrow = "⬇️⬇️⬇️\n# **SELL**\n⬇️⬇️⬇️"
-        action_text = f"**{minutes} MINUT — SELL**"
+        big_arrow = "⬇️⬇️⬇️⬇️⬇️\n⬇️⬇️⬇️⬇️⬇️\n⬇️⬇️⬇️⬇️⬇️"
 
     text = (
         f"**{symbol}**\n\n"
-        f"{arrow}\n\n"
-        f"⏱️ {action_text}\n"
+        f"{big_arrow}\n\n"
+        f"⏱️ **{minutes} MINUT**\n"
         f"🕒 `{xm_time}` (GMT+2)"
     )
 
