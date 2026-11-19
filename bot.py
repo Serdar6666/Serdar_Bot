@@ -11,101 +11,91 @@ def get_market_keyboard():
     markup = InlineKeyboardMarkup()
     markup.row_width = 2
     markup.add(
-        InlineKeyboardButton("💶 EUR/USD", callback_data="price_EURUSD"),
-        InlineKeyboardButton("💷 GBP/USD", callback_data="price_GBPUSD"),
-        InlineKeyboardButton("💴 USD/JPY", callback_data="price_USDJPY"),
-        InlineKeyboardButton("🇦🇺 AUD/USD", callback_data="price_AUDUSD"),
-        InlineKeyboardButton("₿ Bitcoin (BTC)", callback_data="price_BTC"),
-        InlineKeyboardButton("Ξ Ethereum (ETH)", callback_data="price_ETH"),
-        InlineKeyboardButton("🪙 Binance (BNB)", callback_data="price_BNB"),
-        InlineKeyboardButton("💧 Ripple (XRP)", callback_data="price_XRP"),
-        InlineKeyboardButton("☀️ Solana (SOL)", callback_data="price_SOL")
+        InlineKeyboardButton("💶 EUR/USD", callback_data="sig_EURUSD"),
+        InlineKeyboardButton("💷 GBP/USD", callback_data="sig_GBPUSD"),
+        InlineKeyboardButton("💴 USD/JPY", callback_data="sig_USDJPY"),
+        InlineKeyboardButton("🇦🇺 AUD/USD", callback_data="sig_AUDUSD"),
+        InlineKeyboardButton("₿ Bitcoin (BTC)", callback_data="sig_BTC"),
+        InlineKeyboardButton("Ξ Ethereum (ETH)", callback_data="sig_ETH"),
+        InlineKeyboardButton("🪙 Binance (BNB)", callback_data="sig_BNB"),
+        InlineKeyboardButton("💧 Ripple (XRP)", callback_data="sig_XRP"),
+        InlineKeyboardButton("☀️ Solana (SOL)", callback_data="sig_SOL")
     )
     return markup
 
-def get_market_analysis(symbol):
-    price = None
+def get_signal(symbol):
+    now_ns = time.time_ns()
+    seed_val = 0
+
     try:
-        # Keşlenmeginin öňüni almak üçin unikal wagt belgisini goşýarys
-        t_stamp = int(time.time() * 1000)
-        
+        t_param = int(time.time() * 1000)
         if symbol in ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD"]:
-            url = f"https://open.er-api.com/v6/latest/USD?_={t_stamp}"
-            response = requests.get(url, timeout=3)
-            rates = response.json().get("rates", {})
-            
+            url = f"https://open.er-api.com/v6/latest/USD?_={t_param}"
+            resp = requests.get(url, timeout=3)
+            rates = resp.json().get("rates", {})
             if symbol == "EURUSD":
-                eur = rates.get("EUR", 0.92)
-                price = round(1.0 / eur + (t_stamp % 7) * 0.0001, 4)
+                raw = 1.0 / float(rates.get("EUR", 0.92))
             elif symbol == "GBPUSD":
-                gbp = rates.get("GBP", 0.78)
-                price = round(1.0 / gbp + (t_stamp % 7) * 0.0001, 4)
+                raw = 1.0 / float(rates.get("GBP", 0.78))
             elif symbol == "USDJPY":
-                jpy = rates.get("JPY", 154.0)
-                # XM Broker bahasyna takyklaşdyrmak üçin
-                price = round(jpy - 0.25 + (t_stamp % 5) * 0.005, 3)
+                raw = float(rates.get("JPY", 154.0))
             elif symbol == "AUDUSD":
-                aud = rates.get("AUD", 1.52)
-                price = round(1.0 / aud + (t_stamp % 7) * 0.0001, 4)
+                raw = 1.0 / float(rates.get("AUD", 1.52))
+            seed_val = int(round(raw * 100000)) + (now_ns // 1000000)
         else:
             pair = f"{symbol}USDT"
-            res = requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={pair}&_={t_stamp}", timeout=3)
-            price = float(res.json()["price"])
-            if symbol in ["BTC", "ETH"]:
-                price = round(price + (t_stamp % 11) * 0.1, 2)
-            else:
-                price = round(price + (t_stamp % 7) * 0.001, 4)
-                
-    except Exception as e:
-        print(f"API säwligi ({symbol}): {e}")
+            url = f"https://api.binance.com/api/v3/ticker/price?symbol={pair}&_={t_param}"
+            resp = requests.get(url, timeout=3)
+            raw = float(resp.json()["price"])
+            seed_val = int(round(raw * 100)) + (now_ns // 1000000)
+    except Exception:
+        seed_val = now_ns // 1000000
 
-    if price is None:
-        return None, "Maglumat ýok"
+    # Ugrundaky ugry (BUY ýa-da SELL) kesgitlemek
+    is_buy = (seed_val % 2 == 0)
 
-    # Maslahat logikasy
-    int_part = int(price * 100)
-    if int_part % 2 == 0:
-        advice = "🟢 **SATYN ALYŇ (BUY)** 🚀"
-    else:
-        advice = "🔴 **SATYŇ (SELL)** 📉"
-        
-    return price, advice
+    # Näçe minutlykdygyny (1, 2, 3 ýa-da 5 minut) kesgitlemek
+    minutes_list = [1, 2, 3, 5]
+    minutes = minutes_list[(seed_val // 2) % len(minutes_list)]
+
+    return is_buy, minutes
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     bot.send_message(
-        message.chat.id, 
-        "Salam! Aşakdaky esasy bazarlardan birini saýlaň:", 
+        message.chat.id,
+        "Bazary saýlaň:",
         reply_markup=get_market_keyboard()
     )
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
-    symbol = call.data.replace("price_", "")
-    price, advice = get_market_analysis(symbol)
-    
-    # Hakyky XM Broker server wagty (GMT+2)
-    xm_time = (datetime.datetime.utcnow() + datetime.timedelta(hours=2)).strftime('%Y-%m-%d  %H:%M:%S')
-    
-    if price is not None:
-        text = (
-            f"📊 **Bazar Maglumaty: {symbol}**\n\n"
-            f"💰 Häzirki baha: `{price}`\n"
-            f"📈 Maslahat: {advice}\n"
-            f"🕒 XM Server Wagty: `{xm_time}`\n"
-            f"💡 *Maglumat maksatly berilýär.*\n\n"
-            f"👇 Başga bazar saýlaň:"
-        )
+    symbol = call.data.replace("sig_", "")
+    is_buy, minutes = get_signal(symbol)
+
+    xm_time = (datetime.datetime.utcnow() + datetime.timedelta(hours=2)).strftime("%H:%M:%S")
+
+    if is_buy:
+        arrow = "⬆️⬆️⬆️\n# **BUY**\n⬆️⬆️⬆️"
+        action_text = f"**{minutes} MINUT — BUY**"
     else:
-        text = (
-            f"📊 **Bazar Maglumaty: {symbol}**\n\n"
-            f"⚠️ Häzirki wagtda bu bazar ýapyk ýa-da maglumat alyp bolmady.\n"
-            f"🕒 XM Server Wagty: `{xm_time}`\n\n"
-            f"👇 Başga bazar saýlaň:"
-        )
-    
+        arrow = "⬇️⬇️⬇️\n# **SELL**\n⬇️⬇️⬇️"
+        action_text = f"**{minutes} MINUT — SELL**"
+
+    text = (
+        f"**{symbol}**\n\n"
+        f"{arrow}\n\n"
+        f"⏱️ {action_text}\n"
+        f"🕒 `{xm_time}` (GMT+2)"
+    )
+
     bot.answer_callback_query(call.id)
-    bot.send_message(call.message.chat.id, text, reply_markup=get_market_keyboard(), parse_mode="Markdown")
+    bot.send_message(
+        call.message.chat.id,
+        text,
+        reply_markup=get_market_keyboard(),
+        parse_mode="Markdown"
+    )
 
 if __name__ == "__main__":
     print("Bot işe başlady...")
