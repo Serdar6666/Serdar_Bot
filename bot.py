@@ -8,7 +8,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes
 
 # ===== Sazlamalar =====
-BOT_TOKEN = os.environ["BOT_TOKEN = os.environ["BOT_TOKEN"]   # Railway Variables-dan alynýar
+BOT_TOKEN = os.environ["BOT_TOKEN"]   # Railway Variables-dan alynýar
 INTERVAL = "1h"                     # şem wagty: 15m, 1h, 4h, 1d
 RSI_BUY = 30
 RSI_SELL = 70
